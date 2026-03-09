@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --version)",
+      "Bash(nvm ls)",
+      "Bash(source ~/.nvm/nvm.sh)",
+      "Bash(nvm use 20.19.0)",
+      "Bash(npm --version)",
+      "Bash(npm install prisma @prisma/client next-auth@beta @auth/prisma-adapter bcryptjs @types/bcryptjs zod react-hook-form @hookform/resolvers stripe @stripe/stripe-js lucide-react date-fns slugify @tanstack/react-query)",
+      "Bash(npm install framer-motion qrcode react-qr-code @types/qrcode)",
+      "Bash(npx prisma init)",
+      "Bash(npx shadcn@latest add button card input label select badge dialog tabs form dropdown-menu avatar skeleton table textarea --yes)",
+      "Bash(npx shadcn@latest add toast separator progress --yes)",
+      "Bash(npx shadcn@latest add sonner separator progress --yes)",
+      "Bash(npx prisma generate)",
+      "Bash(npm install clsx tailwind-merge dotenv)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npm install class-variance-authority@0.7.0)",
+      "Bash(npm run build)",
+      "Bash(npx prisma db push)"
+    ]
+  }
+}

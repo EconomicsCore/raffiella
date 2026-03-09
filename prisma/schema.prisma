@@ -1,0 +1,242 @@
+// Raffiela — Prisma Schema
+// Database: PostgreSQL (Supabase)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  PARTICIPANT
+  ORGANISER
+  ADMIN
+}
+
+enum BusinessType {
+  BUSINESS
+  CHARITY
+  INDIVIDUAL
+}
+
+enum KycStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum RaffleStatus {
+  DRAFT
+  ACTIVE
+  CANCELLED
+  DRAWN
+}
+
+enum TicketStatus {
+  PENDING
+  CONFIRMED
+  REFUNDED
+}
+
+enum DisputeStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  CLOSED
+}
+
+// ─── USERS ────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String?
+  role          Role      @default(PARTICIPANT)
+  isAnonymous   Boolean   @default(false)
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  organiserProfile OrganiserProfile?
+  tickets          Ticket[]
+  disputes         Dispute[]
+  accounts         Account[]
+  sessions         Session[]
+}
+
+// ─── ORGANISER PROFILE ────────────────────────────────────────────────────────
+
+model OrganiserProfile {
+  id           String       @id @default(cuid())
+  userId       String       @unique
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName String
+  businessType BusinessType
+  description  String?      @db.Text
+  website      String?
+  phone        String?
+  kycStatus    KycStatus    @default(PENDING)
+  kycDocUrl    String?
+  bankDetails  String?
+  isApproved   Boolean      @default(false)
+  approvedAt   DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  raffles Raffle[]
+}
+
+// ─── RAFFLES ──────────────────────────────────────────────────────────────────
+
+model Raffle {
+  id            String           @id @default(cuid())
+  organiserId   String
+  organiser     OrganiserProfile @relation(fields: [organiserId], references: [id])
+  title         String
+  description   String           @db.Text
+  ticketPrice   Decimal          @db.Decimal(10, 2)
+  minTickets    Int              @default(1)
+  maxPerPerson  Int?
+  drawDate      DateTime
+  status        RaffleStatus     @default(DRAFT)
+  isPublic      Boolean          @default(false)
+  isFeatured    Boolean          @default(false)
+  category      String?
+  region        String?
+  slug          String           @unique
+  coverImage    String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  prizes   Prize[]
+  tickets  Ticket[]
+  draw     Draw?
+  disputes Dispute[]
+}
+
+// ─── PRIZES ───────────────────────────────────────────────────────────────────
+
+model Prize {
+  id          String   @id @default(cuid())
+  raffleId    String
+  raffle      Raffle   @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  position    Int
+  name        String
+  description String?  @db.Text
+  value       Decimal? @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+
+  images PrizeImage[]
+  winner Winner?
+}
+
+model PrizeImage {
+  id      String @id @default(cuid())
+  prizeId String
+  prize   Prize  @relation(fields: [prizeId], references: [id], onDelete: Cascade)
+  url     String
+  order   Int    @default(0)
+}
+
+// ─── TICKETS ──────────────────────────────────────────────────────────────────
+
+model Ticket {
+  id              String       @id @default(cuid())
+  raffleId        String
+  raffle          Raffle       @relation(fields: [raffleId], references: [id])
+  userId          String
+  user            User         @relation(fields: [userId], references: [id])
+  quantity        Int          @default(1)
+  totalAmount     Decimal      @db.Decimal(10, 2)
+  paymentIntentId String?
+  status          TicketStatus @default(PENDING)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  winners Winner[]
+}
+
+// ─── DRAWS & WINNERS ─────────────────────────────────────────────────────────
+
+model Draw {
+  id       String   @id @default(cuid())
+  raffleId String   @unique
+  raffle   Raffle   @relation(fields: [raffleId], references: [id])
+  drawnAt  DateTime @default(now())
+  animSeed String?
+
+  winners Winner[]
+}
+
+model Winner {
+  id         String    @id @default(cuid())
+  drawId     String
+  draw       Draw      @relation(fields: [drawId], references: [id])
+  ticketId   String
+  ticket     Ticket    @relation(fields: [ticketId], references: [id])
+  prizeId    String    @unique
+  prize      Prize     @relation(fields: [prizeId], references: [id])
+  acceptedAt DateTime?
+  notifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+// ─── DISPUTES ─────────────────────────────────────────────────────────────────
+
+model Dispute {
+  id          String        @id @default(cuid())
+  raffleId    String
+  raffle      Raffle        @relation(fields: [raffleId], references: [id])
+  raisedById  String
+  raisedBy    User          @relation(fields: [raisedById], references: [id])
+  subject     String
+  description String        @db.Text
+  status      DisputeStatus @default(OPEN)
+  resolution  String?       @db.Text
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+// ─── NEXTAUTH TABLES ─────────────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
