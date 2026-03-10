@@ -15,19 +15,25 @@ export default async function ParticipantDashboard() {
   if (session.user.role === "ORGANISER") redirect("/organiser/dashboard");
   if (session.user.role === "ADMIN") redirect("/admin/dashboard");
 
-  const tickets = await prisma.ticket.findMany({
-    where: { userId: session.user.id },
-    include: {
-      raffle: {
-        include: {
-          prizes: { orderBy: { position: "asc" }, include: { images: { take: 1 } } },
-          organiser: { select: { businessName: true } },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let tickets: any[] = [];
+  try {
+    tickets = await prisma.ticket.findMany({
+      where: { userId: session.user.id },
+      include: {
+        raffle: {
+          include: {
+            prizes: { orderBy: { position: "asc" }, include: { images: { take: 1 } } },
+            organiser: { select: { businessName: true } },
+          },
         },
+        winners: { include: { prize: true } },
       },
-      winners: { include: { prize: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (err) {
+    console.error("Dashboard DB error:", err);
+  }
 
   const active = tickets.filter((t) => t.status === "CONFIRMED" && ["ACTIVE", "DRAFT"].includes(t.raffle.status));
   const won = tickets.filter((t) => t.winners.length > 0);
@@ -93,7 +99,7 @@ export default async function ParticipantDashboard() {
                     <div>
                       <p className="font-semibold">{ticket.raffle.title}</p>
                       <p className="text-sm text-amber-700">
-                        Won: {ticket.winners.map((w) => w.prize.name).join(", ")}
+                        Won: {ticket.winners.map((w: any) => w.prize.name).join(", ")}
                       </p>
                     </div>
                     <Badge className="ml-auto bg-amber-100 text-amber-700">Winner!</Badge>

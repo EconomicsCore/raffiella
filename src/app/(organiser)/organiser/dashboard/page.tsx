@@ -22,27 +22,33 @@ export default async function OrganiserDashboard() {
   if (!session) redirect("/login");
   if (session.user.role !== "ORGANISER" && session.user.role !== "ADMIN") redirect("/dashboard");
 
-  const organiser = await prisma.organiserProfile.findUnique({
-    where: { userId: session.user.id },
-    include: {
-      raffles: {
-        include: {
-          _count: { select: { tickets: { where: { status: "CONFIRMED" } } } },
-          prizes: { orderBy: { position: "asc" }, take: 1 },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let organiser: any = null;
+  try {
+    organiser = await prisma.organiserProfile.findUnique({
+      where: { userId: session.user.id },
+      include: {
+        raffles: {
+          include: {
+            _count: { select: { tickets: { where: { status: "CONFIRMED" } } } },
+            prizes: { orderBy: { position: "asc" }, take: 1 },
+          },
+          orderBy: { createdAt: "desc" },
         },
-        orderBy: { createdAt: "desc" },
       },
-    },
-  });
+    });
+  } catch (err) {
+    console.error("Organiser dashboard DB error:", err);
+  }
 
   if (!organiser) redirect("/register?role=ORGANISER");
 
   // Stats
-  const totalTickets = organiser.raffles.reduce((s, r) => s + r._count.tickets, 0);
-  const totalRevenue = organiser.raffles.reduce((s, r) => {
+  const totalTickets = organiser.raffles.reduce((s: number, r: any) => s + r._count.tickets, 0);
+  const totalRevenue = organiser.raffles.reduce((s: number, r: any) => {
     return s + r._count.tickets * Number(r.ticketPrice);
   }, 0);
-  const activeCount = organiser.raffles.filter((r) => r.status === "ACTIVE").length;
+  const activeCount = organiser.raffles.filter((r: any) => r.status === "ACTIVE").length;
   const platformFee = totalRevenue * 0.05;
   const netRevenue = totalRevenue - platformFee;
 
@@ -124,7 +130,7 @@ export default async function OrganiserDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {organiser.raffles.map((raffle) => {
+                {organiser.raffles.map((raffle: any) => {
                   const revenue = raffle._count.tickets * Number(raffle.ticketPrice);
                   return (
                     <TableRow key={raffle.id}>

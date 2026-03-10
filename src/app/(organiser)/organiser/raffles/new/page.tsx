@@ -9,7 +9,13 @@ export default async function NewRafflePage() {
   const session = await auth();
   if (!session || session.user.role !== "ORGANISER") redirect("/dashboard");
 
-  const organiser = await prisma.organiserProfile.findUnique({ where: { userId: session.user.id } });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let organiser: any = null;
+  try {
+    organiser = await prisma.organiserProfile.findUnique({ where: { userId: session.user.id } });
+  } catch (err) {
+    console.error("New raffle page DB error:", err);
+  }
   if (!organiser?.isApproved) redirect("/organiser/dashboard");
 
   return (

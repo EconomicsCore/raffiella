@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { prisma } from "@/lib/prisma";
 import type { RaffleWithDetails } from "@/types";
 
-async function getRaffles(searchParams: Record<string, string>) {
+async function getRaffles(searchParams: Record<string, string>): Promise<RaffleWithDetails[]> {
   const where: Record<string, unknown> = { isPublic: true };
 
   if (searchParams.status === "ACTIVE") where.status = "ACTIVE";
@@ -22,15 +22,20 @@ async function getRaffles(searchParams: Record<string, string>) {
   else if (searchParams.sort === "newest") orderBy.createdAt = "desc";
   else orderBy.drawDate = "asc";
 
-  return prisma.raffle.findMany({
-    where,
-    orderBy,
-    include: {
-      organiser: { include: { user: { select: { name: true, image: true } } } },
-      prizes: { orderBy: { position: "asc" }, include: { images: { orderBy: { order: "asc" }, take: 1 } } },
-      _count: { select: { tickets: { where: { status: "CONFIRMED" } } } },
-    },
-  }) as unknown as Promise<RaffleWithDetails[]>;
+  try {
+    return await prisma.raffle.findMany({
+      where,
+      orderBy,
+      include: {
+        organiser: { include: { user: { select: { name: true, image: true } } } },
+        prizes: { orderBy: { position: "asc" }, include: { images: { orderBy: { order: "asc" }, take: 1 } } },
+        _count: { select: { tickets: { where: { status: "CONFIRMED" } } } },
+      },
+    }) as unknown as RaffleWithDetails[];
+  } catch (err) {
+    console.error("Failed to fetch raffles:", err);
+    return [];
+  }
 }
 
 function RaffleGridSkeleton() {
