@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { stripe } from "@/lib/stripe";
+import { initializeTransaction } from "@/lib/paystack";
 import { z } from "zod";
+import crypto from "crypto";
 
 const ticketSchema = z.object({
   raffleId: z.string(),
@@ -42,12 +43,17 @@ export async function POST(req: Request) {
     }
 
     const totalAmount = Number(raffle.ticketPrice) * quantity;
-    const amountInCents = Math.round(totalAmount * 100);
+    const amountInKobo = Math.round(totalAmount * 100); // Paystack uses smallest currency unit
 
-    // Create Stripe Payment Intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: amountInCents,
-      currency: "zar",
+    // Unique reference for this transaction
+    const reference = `raffle_${raffleId}_${crypto.randomBytes(8).toString("hex")}`;
+
+    // Initialize Paystack transaction
+    const paystack = await initializeTransaction({
+      email: session.user.email!,
+      amount: amountInKobo,
+      reference,
+      callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/raffles`,
       metadata: {
         raffleId,
         userId: session.user.id,
@@ -55,22 +61,28 @@ export async function POST(req: Request) {
       },
     });
 
-    // Create pending ticket record
+    if (!paystack.status) {
+      return NextResponse.json({ error: "Payment initialisation failed" }, { status: 500 });
+    }
+
+    // Create pending ticket — confirmed by webhook once payment succeeds
     const ticket = await prisma.ticket.create({
       data: {
         raffleId,
         userId: session.user.id,
         quantity,
         totalAmount,
-        paymentIntentId: paymentIntent.id,
+        paymentIntentId: reference, // reusing field to store Paystack reference
         status: "PENDING",
       },
     });
 
     return NextResponse.json({
       ticketId: ticket.id,
-      clientSecret: paymentIntent.client_secret,
+      reference: paystack.data.reference,
+      accessCode: paystack.data.access_code,
       amount: totalAmount,
+      amountInKobo,
     });
   } catch (err) {
     if (err instanceof z.ZodError) {

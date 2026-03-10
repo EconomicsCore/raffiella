@@ -14,6 +14,24 @@ import { Calendar, MapPin, Ticket, Trophy, Users, Minus, Plus, Info } from "luci
 import { toast } from "sonner";
 import QRCode from "react-qr-code";
 
+// Paystack inline JS global type
+declare global {
+  interface Window {
+    PaystackPop: {
+      setup: (options: {
+        key: string;
+        email: string;
+        amount: number;
+        currency: string;
+        ref: string;
+        metadata?: Record<string, unknown>;
+        callback: (response: { reference: string; status: string }) => void;
+        onClose: () => void;
+      }) => { openIframe: () => void };
+    };
+  }
+}
+
 export default function RaffleDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { data: session } = useSession();
@@ -24,6 +42,15 @@ export default function RaffleDetailPage() {
   const [purchasing, setPurchasing] = useState(false);
   const [showDraw, setShowDraw] = useState(false);
 
+  // Load Paystack inline JS once
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://js.paystack.co/v1/inline.js";
+    script.async = true;
+    document.body.appendChild(script);
+    return () => { document.body.removeChild(script); };
+  }, []);
+
   useEffect(() => {
     fetch(`/api/raffles/${slug}`)
       .then((r) => r.json())
@@ -33,18 +60,49 @@ export default function RaffleDetailPage() {
   const purchase = async () => {
     if (!session) { toast.error("Sign in to purchase tickets"); return; }
     setPurchasing(true);
-    const res = await fetch("/api/tickets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ raffleId: raffle.id, quantity }),
-    });
-    const data = await res.json();
-    setPurchasing(false);
 
-    if (!res.ok) { toast.error(data.error); return; }
-    // In production: open Stripe Elements with data.clientSecret
-    // For demo: show success
-    toast.success(`${quantity} ticket${quantity > 1 ? "s" : ""} reserved! Complete payment to confirm.`);
+    try {
+      // Step 1 — create pending ticket + initialize Paystack transaction
+      const res = await fetch("/api/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ raffleId: raffle.id, quantity }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) { toast.error(data.error); setPurchasing(false); return; }
+
+      // Step 2 — open Paystack inline popup
+      const handler = window.PaystackPop.setup({
+        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY!,
+        email: session.user?.email!,
+        amount: data.amountInKobo,
+        currency: "ZAR",
+        ref: data.reference,
+        metadata: { ticketId: data.ticketId },
+
+        // Step 3 — on success, verify from our backend as well
+        callback: async (response) => {
+          const verifyRes = await fetch(`/api/tickets/verify?reference=${response.reference}`);
+          if (verifyRes.ok) {
+            toast.success(`🎉 ${quantity} ticket${quantity > 1 ? "s" : ""} confirmed!`);
+          } else {
+            toast.info("Payment received — your ticket will be confirmed shortly.");
+          }
+          setPurchasing(false);
+        },
+
+        onClose: () => {
+          toast.warning("Payment cancelled.");
+          setPurchasing(false);
+        },
+      });
+
+      handler.openIframe();
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+      setPurchasing(false);
+    }
   };
 
   if (loading) {
@@ -195,7 +253,7 @@ export default function RaffleDetailPage() {
               {isActive ? (
                 <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={purchase} disabled={purchasing}>
                   <Ticket className="mr-2 h-4 w-4" />
-                  {purchasing ? "Processing…" : session ? "Buy Tickets" : "Sign in to Buy"}
+                  {purchasing ? "Opening payment…" : session ? "Buy Tickets" : "Sign in to Buy"}
                 </Button>
               ) : (
                 <Button disabled className="w-full">{isDrawn ? "Draw Complete" : "Not Available"}</Button>
@@ -205,6 +263,7 @@ export default function RaffleDetailPage() {
                   <Info className="h-3 w-3" /> Max {raffle.maxPerPerson} tickets per person
                 </p>
               )}
+              <p className="text-center text-xs text-gray-400">Secured by Paystack 🔒</p>
             </CardContent>
           </Card>
 
