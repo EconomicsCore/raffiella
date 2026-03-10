@@ -52,17 +52,21 @@ function RegisterForm() {
     }
 
     // Auto sign in
-    const result = await signIn("credentials", { email: form.email, password: form.password, redirect: false });
-    setLoading(false);
-
-    if (result?.error) {
-      toast.error("Registered but couldn't sign in automatically. Please log in.");
+    try {
+      const result = await signIn("credentials", { email: form.email, password: form.password, redirect: false });
+      if (result?.error) {
+        toast.error("Registered! Please sign in to continue.");
+        router.push("/login");
+        return;
+      }
+      toast.success("Account created!");
+      router.push(form.role === "ORGANISER" ? "/organiser/dashboard" : "/dashboard");
+    } catch {
+      toast.error("Registered! Please sign in to continue.");
       router.push("/login");
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    toast.success("Account created!");
-    router.push(form.role === "ORGANISER" ? "/organiser/dashboard" : "/dashboard");
   };
 
   return (

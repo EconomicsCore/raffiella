@@ -1,6 +1,5 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -11,7 +10,8 @@ const loginSchema = z.object({
 });
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  // No adapter — we use JWT-only sessions with credentials provider.
+  // PrismaAdapter + JWT causes unnecessary DB writes on every sign-in.
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
