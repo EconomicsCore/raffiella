@@ -12,6 +12,7 @@ const loginSchema = z.object({
 export const { handlers, auth, signIn, signOut } = NextAuth({
   // No adapter — we use JWT-only sessions with credentials provider.
   // PrismaAdapter + JWT causes unnecessary DB writes on every sign-in.
+  trustHost: true, // Required for Vercel/proxy deployments with NextAuth v5
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
