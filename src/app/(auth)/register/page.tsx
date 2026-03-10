@@ -44,7 +44,10 @@ function RegisterForm() {
     if (!res.ok) {
       const data = await res.json();
       setLoading(false);
-      toast.error(data.error ?? "Registration failed");
+      const message = data.detail
+        ? `${data.error}: ${data.detail}`
+        : (data.error ?? "Registration failed");
+      toast.error(message, { duration: 8000 });
       return;
     }
 
