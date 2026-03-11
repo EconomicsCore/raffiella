@@ -21,7 +21,11 @@ const schema = z.object({
   description: z.string().min(20, "Description must be at least 20 characters"),
   ticketPrice: z.coerce.number().positive("Must be positive"),
   minTickets: z.coerce.number().int().positive("Must be at least 1"),
-  maxPerPerson: z.coerce.number().int().positive().nullable().optional(),
+  // preprocess empty string → undefined so the optional() check can pass
+  maxPerPerson: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : Number(v)),
+    z.number().int().min(1, "Must be at least 1").optional()
+  ),
   drawDate: z.string().min(1, "Required"),
   drawTime: z.string().min(1, "Required"),
   isPublic: z.boolean().default(false),
@@ -32,7 +36,11 @@ const schema = z.object({
     position: z.number(),
     name: z.string().min(2, "Prize name required"),
     description: z.string().optional(),
-    value: z.coerce.number().nullable().optional(),
+    // preprocess empty string → undefined for optional prize value
+    value: z.preprocess(
+      (v) => (v === "" || v === null || v === undefined ? undefined : Number(v)),
+      z.number().optional()
+    ),
     showValue: z.boolean().default(true),
   })).min(1, "At least one prize required"),
 });
@@ -53,7 +61,7 @@ export default function CreateRaffleForm() {
   const form = useForm<FormData>({ resolver: zodResolver(schema) as any,
     defaultValues: {
       isPublic: true,
-      prizes: [{ position: 1, name: "", description: "", value: null, showValue: true }],
+      prizes: [{ position: 1, name: "", description: "", value: undefined, showValue: true }],
     },
   });
 
@@ -136,7 +144,13 @@ export default function CreateRaffleForm() {
       </div>
 
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <form onSubmit={form.handleSubmit(onSubmit as any)}>
+      <form onSubmit={form.handleSubmit(onSubmit as any, (errors) => {
+        console.error("Form validation errors:", errors);
+        const firstError = Object.values(errors).flatMap((e: any) =>
+          Array.isArray(e) ? e.flatMap((p: any) => Object.values(p ?? {})) : [e]
+        ).find((e: any) => e?.message);
+        toast.error(firstError?.message ?? "Please check all fields are filled in correctly");
+      })}>
         {/* Step 0: Basic Info */}
         {step === 0 && (
           <Card>
@@ -253,7 +267,7 @@ export default function CreateRaffleForm() {
                   variant="outline"
                   className="w-full border-dashed"
                   onClick={() => {
-                    append({ position: fields.length + 1, name: "", description: "", value: null, showValue: true });
+                    append({ position: fields.length + 1, name: "", description: "", value: undefined, showValue: true });
                     setPrizeImages((prev) => [...prev, null]);
                   }}
                 >
