@@ -35,34 +35,34 @@ function RegisterForm() {
     if (form.role === "ORGANISER" && !form.businessName) { toast.error("Business name is required"); return; }
 
     setLoading(true);
-    const res = await fetch("/api/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-
-    if (!res.ok) {
-      const data = await res.json();
-      setLoading(false);
-      const message = data.detail
-        ? `${data.error}: ${data.detail}`
-        : (data.error ?? "Registration failed");
-      toast.error(message, { duration: 8000 });
-      return;
-    }
-
-    // Auto sign in
     try {
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        const message = data.detail
+          ? `${data.error}: ${data.detail}`
+          : (data.error ?? "Registration failed");
+        toast.error(message, { duration: 8000 });
+        return;
+      }
+
+      // Auto sign in
       const result = await signIn("credentials", { email: form.email, password: form.password, redirect: false });
       if (result?.error) {
-        toast.error("Registered! Please sign in to continue.");
+        toast.info("Account created! Please sign in to continue.");
         router.push("/login");
         return;
       }
       toast.success("Account created!");
       router.push(form.role === "ORGANISER" ? "/organiser/dashboard" : "/dashboard");
-    } catch {
-      toast.error("Registered! Please sign in to continue.");
+    } catch (err) {
+      console.error("[register] unexpected error:", err);
+      toast.info("Account may have been created. Please try signing in.");
       router.push("/login");
     } finally {
       setLoading(false);
