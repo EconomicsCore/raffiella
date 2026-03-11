@@ -269,10 +269,12 @@ function ApproveButton({ id, approve }: { id: string; approve: boolean }) {
     <form action={async () => {
       "use server";
       const { prisma: db } = await import("@/lib/prisma");
+      const { revalidatePath } = await import("next/cache");
       await db.organiserProfile.update({
         where: { id },
         data: { isApproved: approve, kycStatus: approve ? "APPROVED" : "REJECTED", approvedAt: approve ? new Date() : null },
       });
+      revalidatePath("/admin/dashboard");
     }}>
       <Button
         type="submit"
@@ -291,7 +293,9 @@ function FeatureButton({ raffleId, isFeatured }: { raffleId: string; isFeatured:
     <form action={async () => {
       "use server";
       const { prisma: db } = await import("@/lib/prisma");
+      const { revalidatePath } = await import("next/cache");
       await db.raffle.update({ where: { id: raffleId }, data: { isFeatured: !isFeatured } });
+      revalidatePath("/admin/dashboard");
     }}>
       <Button type="submit" size="sm" variant="ghost" className="h-7 text-xs">
         {isFeatured ? "⭐ Unfeature" : "☆ Feature"}
