@@ -101,6 +101,7 @@ export async function POST(req: Request) {
       slug = `${baseSlug}-${counter++}`;
     }
 
+    // Create raffle first (no nested creates — avoids pooler transaction issues)
     const raffle = await prisma.raffle.create({
       data: {
         organiserId: organiser.id,
@@ -116,23 +117,38 @@ export async function POST(req: Request) {
         coverImage: data.coverImage,
         slug,
         status: "DRAFT",
-        prizes: {
-          create: data.prizes.map((p) => ({
-            position: p.position,
-            name: p.name,
-            description: p.description,
-            value: p.value,
-            showValue: p.showValue ?? true,
-            images: p.images?.length
-              ? { create: p.images }
-              : undefined,
-          })),
-        },
       },
-      include: { prizes: { include: { images: true } } },
     });
 
-    return NextResponse.json(raffle, { status: 201 });
+    // Create each prize separately, then its images
+    for (const p of data.prizes) {
+      const prize = await prisma.prize.create({
+        data: {
+          raffleId: raffle.id,
+          position: p.position,
+          name: p.name,
+          description: p.description,
+          value: p.value,
+          showValue: p.showValue ?? true,
+        },
+      });
+
+      if (p.images?.length) {
+        for (const img of p.images) {
+          await prisma.prizeImage.create({
+            data: { prizeId: prize.id, url: img.url, order: img.order },
+          });
+        }
+      }
+    }
+
+    // Return raffle with prizes + images included
+    const fullRaffle = await prisma.raffle.findUnique({
+      where: { id: raffle.id },
+      include: { prizes: { include: { images: true }, orderBy: { position: "asc" } } },
+    });
+
+    return NextResponse.json(fullRaffle, { status: 201 });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 422 });
