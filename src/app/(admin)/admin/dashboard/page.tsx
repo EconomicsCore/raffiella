@@ -14,10 +14,14 @@ export default async function AdminDashboard() {
   const session = await auth();
   if (!session || session.user.role !== "ADMIN") redirect("/dashboard");
 
-  let pendingOrganisers: Awaited<ReturnType<typeof prisma.organiserProfile.findMany>> = [];
-  let allOrganisers:     Awaited<ReturnType<typeof prisma.organiserProfile.findMany>> = [];
-  let allRaffles:        Awaited<ReturnType<typeof prisma.raffle.findMany>>           = [];
-  let disputes:          Awaited<ReturnType<typeof prisma.dispute.findMany>>          = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let pendingOrganisers: any[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let allOrganisers:     any[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let allRaffles:        any[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let disputes:          any[] = [];
 
   try {
     [pendingOrganisers, allOrganisers, allRaffles, disputes] = await Promise.all([
