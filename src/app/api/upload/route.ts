@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { supabaseAdmin } from "@/lib/supabase-server";
+import { getSupabaseAdmin } from "@/lib/supabase-server";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -26,7 +26,9 @@ export async function POST(req: Request) {
     const filename = `prizes/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    const { error: uploadError } = await supabaseAdmin.storage
+    const supabase = getSupabaseAdmin();
+
+    const { error: uploadError } = await supabase.storage
       .from("prize-images")
       .upload(filename, buffer, { contentType: file.type, upsert: false });
 
@@ -35,7 +37,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: uploadError.message }, { status: 500 });
     }
 
-    const { data: { publicUrl } } = supabaseAdmin.storage
+    const { data: { publicUrl } } = supabase.storage
       .from("prize-images")
       .getPublicUrl(filename);
 
