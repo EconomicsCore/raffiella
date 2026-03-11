@@ -8,7 +8,12 @@ export default auth((req) => {
   // Public routes — always accessible
   const publicRoutes = ["/", "/login", "/register", "/raffles"];
   const isPublicRaffle = pathname.startsWith("/raffles/");
-  const isPublic = publicRoutes.includes(pathname) || isPublicRaffle || pathname.startsWith("/api/auth");
+  const isPublic =
+    publicRoutes.includes(pathname) ||
+    isPublicRaffle ||
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/register") ||
+    pathname.startsWith("/api/webhooks");
 
   if (isPublic) return NextResponse.next();
 
