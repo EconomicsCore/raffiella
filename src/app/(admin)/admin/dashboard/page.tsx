@@ -127,7 +127,7 @@ export default async function AdminDashboard() {
                         <TableCell><Badge variant="outline">{org.businessType}</Badge></TableCell>
                         <TableCell className="text-sm text-gray-500">{formatDate(org.createdAt)}</TableCell>
                         <TableCell>
-                          <Badge className={{ PENDING: "bg-gray-100 text-gray-600", SUBMITTED: "bg-blue-100 text-blue-700", APPROVED: "bg-green-100 text-green-700", REJECTED: "bg-red-100 text-red-600" }[org.kycStatus] ?? ""}>
+                          <Badge className={{ PENDING: "bg-gray-100 text-gray-600", SUBMITTED: "bg-blue-100 text-blue-700", APPROVED: "bg-green-100 text-green-700", REJECTED: "bg-red-100 text-red-600" }[org.kycStatus as string] ?? ""}>
                             {org.kycStatus}
                           </Badge>
                         </TableCell>
