@@ -14,30 +14,39 @@ export default async function AdminDashboard() {
   const session = await auth();
   if (!session || session.user.role !== "ADMIN") redirect("/dashboard");
 
-  const [pendingOrganisers, allOrganisers, allRaffles, disputes] = await Promise.all([
-    prisma.organiserProfile.findMany({
-      where: { isApproved: false },
-      include: { user: { select: { name: true, email: true, createdAt: true } }, _count: { select: { raffles: true } } },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.organiserProfile.findMany({
-      include: { user: { select: { name: true, email: true } }, _count: { select: { raffles: true } } },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.raffle.findMany({
-      include: {
-        organiser: { select: { businessName: true } },
-        _count: { select: { tickets: { where: { status: "CONFIRMED" } } } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    }),
-    prisma.dispute.findMany({
-      where: { status: { in: ["OPEN", "INVESTIGATING"] } },
-      include: { raffle: { select: { title: true } }, raisedBy: { select: { name: true, email: true } } },
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
+  let pendingOrganisers: Awaited<ReturnType<typeof prisma.organiserProfile.findMany>> = [];
+  let allOrganisers:     Awaited<ReturnType<typeof prisma.organiserProfile.findMany>> = [];
+  let allRaffles:        Awaited<ReturnType<typeof prisma.raffle.findMany>>           = [];
+  let disputes:          Awaited<ReturnType<typeof prisma.dispute.findMany>>          = [];
+
+  try {
+    [pendingOrganisers, allOrganisers, allRaffles, disputes] = await Promise.all([
+      prisma.organiserProfile.findMany({
+        where: { isApproved: false },
+        include: { user: { select: { name: true, email: true, createdAt: true } }, _count: { select: { raffles: true } } },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.organiserProfile.findMany({
+        include: { user: { select: { name: true, email: true } }, _count: { select: { raffles: true } } },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.raffle.findMany({
+        include: {
+          organiser: { select: { businessName: true } },
+          _count: { select: { tickets: { where: { status: "CONFIRMED" } } } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      }),
+      prisma.dispute.findMany({
+        where: { status: { in: ["OPEN", "INVESTIGATING"] } },
+        include: { raffle: { select: { title: true } }, raisedBy: { select: { name: true, email: true } } },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+  } catch (err) {
+    console.error("[admin] dashboard DB error:", err);
+  }
 
   const totalRevenue = allRaffles.reduce((s, r) => s + r._count.tickets * Number(r.ticketPrice), 0);
   const platformRevenue = totalRevenue * 0.05;

@@ -25,24 +25,26 @@ export async function POST(req: Request) {
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
+    // Create user first
     const user = await prisma.user.create({
       data: {
         name: data.name,
         email: data.email,
         password: hashedPassword,
         role: data.role,
-        ...(data.role === "ORGANISER" && data.businessName && data.businessType
-          ? {
-              organiserProfile: {
-                create: {
-                  businessName: data.businessName,
-                  businessType: data.businessType,
-                },
-              },
-            }
-          : {}),
       },
     });
+
+    // Create organiser profile in a separate query (avoids nested transaction issues with pooler)
+    if (data.role === "ORGANISER" && data.businessName && data.businessType) {
+      await prisma.organiserProfile.create({
+        data: {
+          userId: user.id,
+          businessName: data.businessName,
+          businessType: data.businessType,
+        },
+      });
+    }
 
     return NextResponse.json({ id: user.id, email: user.email, role: user.role }, { status: 201 });
   } catch (err) {
