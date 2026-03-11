@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RAFFLE_CATEGORIES, SA_REGIONS } from "@/lib/utils";
-import { Plus, Trash2, ChevronRight, ChevronLeft, Trophy } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronLeft, Trophy, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -33,6 +33,7 @@ const schema = z.object({
     name: z.string().min(2, "Prize name required"),
     description: z.string().optional(),
     value: z.coerce.number().nullable().optional(),
+    showValue: z.boolean().default(true),
   })).min(1, "At least one prize required"),
 });
 
@@ -43,15 +44,34 @@ const STEPS = ["Basic Info", "Prizes", "Settings", "Review"];
 export default function CreateRaffleForm() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [prizeImages, setPrizeImages] = useState<(string | null)[]>([null]);
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const form = useForm<FormData>({ resolver: zodResolver(schema) as any,
     defaultValues: {
       isPublic: true,
-      prizes: [{ position: 1, name: "", description: "", value: null }],
+      prizes: [{ position: 1, name: "", description: "", value: null, showValue: true }],
     },
   });
+
+  const handleImageUpload = async (index: number, file: File) => {
+    setUploadingIndex(index);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Upload failed");
+      setPrizeImages((prev) => { const next = [...prev]; next[index] = data.url; return next; });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Image upload failed");
+    } finally {
+      setUploadingIndex(null);
+    }
+  };
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "prizes" });
   const values = form.watch();
@@ -76,7 +96,11 @@ export default function CreateRaffleForm() {
         body: JSON.stringify({
           ...data,
           drawDate,
-          prizes: data.prizes.map((p, i) => ({ ...p, position: i + 1 })),
+          prizes: data.prizes.map((p, i) => ({
+            ...p,
+            position: i + 1,
+            images: prizeImages[i] ? [{ url: prizeImages[i], order: 0 }] : [],
+          })),
         }),
       });
       if (!res.ok) {
@@ -166,6 +190,40 @@ export default function CreateRaffleForm() {
                       </Button>
                     )}
                   </div>
+                  {/* Prize image upload */}
+                  <div>
+                    <Label>Prize Image</Label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      ref={(el) => { fileInputRefs.current[i] = el; }}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(i, f); }}
+                    />
+                    {prizeImages[i] ? (
+                      <div className="relative mt-1 inline-block">
+                        <img src={prizeImages[i]!} alt="Prize" className="h-24 w-24 rounded-lg object-cover border" />
+                        <button
+                          type="button"
+                          onClick={() => setPrizeImages((prev) => { const next = [...prev]; next[i] = null; return next; })}
+                          className="absolute -top-2 -right-2 rounded-full bg-red-500 p-0.5 text-white"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRefs.current[i]?.click()}
+                        disabled={uploadingIndex === i}
+                        className="mt-1 flex h-24 w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-200 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500 transition-colors"
+                      >
+                        <Upload className="h-4 w-4" />
+                        {uploadingIndex === i ? "Uploading…" : "Upload image"}
+                      </button>
+                    )}
+                  </div>
+
                   <div>
                     <Label>Prize Name *</Label>
                     <Input placeholder="e.g. iPhone 16 Pro 256GB" {...form.register(`prizes.${i}.name`)} />
@@ -178,7 +236,13 @@ export default function CreateRaffleForm() {
                     <Textarea rows={2} placeholder="Optional prize details..." {...form.register(`prizes.${i}.description`)} />
                   </div>
                   <div>
-                    <Label>Estimated Value (ZAR)</Label>
+                    <div className="flex items-center justify-between mb-1">
+                      <Label>Estimated Value (ZAR)</Label>
+                      <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                        <input type="checkbox" className="rounded" {...form.register(`prizes.${i}.showValue`)} defaultChecked />
+                        Show value publicly
+                      </label>
+                    </div>
                     <Input type="number" placeholder="0.00" {...form.register(`prizes.${i}.value`)} />
                   </div>
                 </div>
@@ -188,7 +252,10 @@ export default function CreateRaffleForm() {
                   type="button"
                   variant="outline"
                   className="w-full border-dashed"
-                  onClick={() => append({ position: fields.length + 1, name: "", description: "", value: null })}
+                  onClick={() => {
+                    append({ position: fields.length + 1, name: "", description: "", value: null, showValue: true });
+                    setPrizeImages((prev) => [...prev, null]);
+                  }}
                 >
                   <Plus className="mr-2 h-4 w-4" /> Add Prize
                 </Button>

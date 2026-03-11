@@ -178,7 +178,7 @@ export default function RaffleDetailPage() {
               <Trophy className="h-5 w-5 text-blue-600" /> Prizes
             </h2>
             <div className="space-y-3">
-              {raffle.prizes.map((prize: { id: string; position: number; name: string; description?: string; value?: number; images: { url: string }[]; winner?: { ticket: { user: { name?: string; isAnonymous?: boolean } } } }) => (
+              {raffle.prizes.map((prize: { id: string; position: number; name: string; description?: string; value?: number; showValue?: boolean; images: { url: string }[]; winner?: { ticket: { user: { name?: string; isAnonymous?: boolean } } } }) => (
                 <div key={prize.id} className="flex gap-4 rounded-xl border p-4">
                   {prize.images[0] && (
                     <img src={prize.images[0].url} alt={prize.name} className="h-20 w-20 rounded-lg object-cover flex-shrink-0" />
@@ -189,7 +189,7 @@ export default function RaffleDetailPage() {
                         {prize.position}
                       </span>
                       <span className="font-semibold">{prize.name}</span>
-                      {prize.value && <span className="text-sm text-gray-500">({formatZAR(prize.value)})</span>}
+                      {prize.value && prize.showValue !== false && <span className="text-sm text-gray-500">({formatZAR(prize.value)})</span>}
                     </div>
                     {prize.description && <p className="mt-1 text-sm text-gray-600">{prize.description}</p>}
                     {isDrawn && prize.winner && (

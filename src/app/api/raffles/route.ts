@@ -70,6 +70,7 @@ const createRaffleSchema = z.object({
       name: z.string().min(2),
       description: z.string().optional(),
       value: z.number().nullable().optional(),
+      showValue: z.boolean().default(true),
       images: z.array(z.object({ url: z.string(), order: z.number() })).optional(),
     })
   ).min(1),
@@ -121,7 +122,8 @@ export async function POST(req: Request) {
             name: p.name,
             description: p.description,
             value: p.value,
-            images: p.images
+            showValue: p.showValue ?? true,
+            images: p.images?.length
               ? { create: p.images }
               : undefined,
           })),

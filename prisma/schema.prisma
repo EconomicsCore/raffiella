@@ -133,6 +133,7 @@ model Prize {
   name        String
   description String?  @db.Text
   value       Decimal? @db.Decimal(10, 2)
+  showValue   Boolean  @default(true)
   createdAt   DateTime @default(now())
 
   images PrizeImage[]
